@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 import '../models/user_model.dart';
 import '../models/health_data_model.dart';
+part 'api_service.g.dart';
 
 /// Simple logger interface used by the generated API client to report
 /// JSON parsing errors. The implementation can forward the error to any
@@ -10,8 +11,6 @@ import '../models/health_data_model.dart';
 abstract class ParseErrorLogger {
   void logError(Object error, StackTrace stackTrace, RequestOptions options);
 }
-
-part 'api_service.g.dart';
 
 @RestApi(baseUrl: 'https://api.signcare.com/v1')
 abstract class ApiService {
@@ -84,11 +83,13 @@ abstract class ApiService {
 
   // Body Measurements
   @POST('/body/measurements')
-  Future<BodyMeasurement> createBodyMeasurement(@Body() BodyMeasurement measurement);
+  Future<BodyMeasurement> createBodyMeasurement(
+      @Body() BodyMeasurement measurement);
 
   @POST('/body/scan')
   @MultiPart()
-  Future<BodyScanResult> scanBody(@Part() File frontImage, @Part() File sideImage);
+  Future<BodyScanResult> scanBody(
+      @Part() File frontImage, @Part() File sideImage);
 
   // Sleep Tracking
   @POST('/sleep/data')
@@ -330,7 +331,8 @@ class SleepAnalysis {
     return SleepAnalysis(
       averageSleepDuration: (json['average_sleep_duration'] as num).toDouble(),
       sleepEfficiency: (json['sleep_efficiency'] as num).toDouble(),
-      sleepStagePercentages: Map<String, double>.from(json['sleep_stage_percentages'] as Map),
+      sleepStagePercentages:
+          Map<String, double>.from(json['sleep_stage_percentages'] as Map),
       insights: List<String>.from(json['insights'] as List),
       recommendations: List<String>.from(json['recommendations'] as List),
     );
@@ -583,4 +585,3 @@ class Notification {
     );
   }
 }
-
