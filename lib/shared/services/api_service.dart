@@ -4,11 +4,22 @@ import 'package:retrofit/retrofit.dart';
 import '../models/user_model.dart';
 import '../models/health_data_model.dart';
 
+/// Simple logger interface used by the generated API client to report
+/// JSON parsing errors. The implementation can forward the error to any
+/// logging service.
+abstract class ParseErrorLogger {
+  void logError(Object error, StackTrace stackTrace, RequestOptions options);
+}
+
 part 'api_service.g.dart';
 
 @RestApi(baseUrl: 'https://api.signcare.com/v1')
 abstract class ApiService {
-  factory ApiService(Dio dio, {String baseUrl}) = _ApiService;
+  factory ApiService(
+    Dio dio, {
+    String? baseUrl,
+    ParseErrorLogger? errorLogger,
+  }) = _ApiService;
 
   // Authentication
   @POST('/auth/login')

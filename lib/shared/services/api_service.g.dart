@@ -178,12 +178,15 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<String> uploadProfileImage(InvalidType image) async {
+  Future<String> uploadProfileImage(File image) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
     final _data = FormData();
-    _data.fields.add(MapEntry('image', image));
+    _data.files.add(MapEntry(
+      'image',
+      await MultipartFile.fromFile(image.path),
+    ));
     final _options = _setStreamType<String>(
       Options(
         method: 'POST',
@@ -321,12 +324,15 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<FoodRecognitionResponse> recognizeFood(InvalidType image) async {
+  Future<FoodRecognitionResponse> recognizeFood(File image) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
     final _data = FormData();
-    _data.fields.add(MapEntry('image', image));
+    _data.files.add(MapEntry(
+      'image',
+      await MultipartFile.fromFile(image.path),
+    ));
     final _options = _setStreamType<FoodRecognitionResponse>(
       Options(
         method: 'POST',
@@ -502,15 +508,21 @@ class _ApiService implements ApiService {
 
   @override
   Future<BodyScanResult> scanBody(
-    InvalidType frontImage,
-    InvalidType sideImage,
+    File frontImage,
+    File sideImage,
   ) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
     final _data = FormData();
-    _data.fields.add(MapEntry('frontImage', frontImage));
-    _data.fields.add(MapEntry('sideImage', sideImage));
+    _data.files.add(MapEntry(
+      'frontImage',
+      await MultipartFile.fromFile(frontImage.path),
+    ));
+    _data.files.add(MapEntry(
+      'sideImage',
+      await MultipartFile.fromFile(sideImage.path),
+    ));
     final _options = _setStreamType<BodyScanResult>(
       Options(
         method: 'POST',
