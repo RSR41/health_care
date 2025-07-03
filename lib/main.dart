@@ -4,11 +4,19 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 
 void main() {
-  runApp(
-    const ProviderScope(
+  runApp(const MyApp());
+}
+
+/// Root widget that provides the [ProviderScope] for the application.
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const ProviderScope(
       child: HealthcareApp(),
-    ),
-  );
+    );
+  }
 }
 
 class HealthcareApp extends ConsumerWidget {
