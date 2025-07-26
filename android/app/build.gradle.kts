@@ -28,6 +28,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        minSdk = 26  // health 플러그인 요구사항 맞춤 (21 -> 26)
+        // targetSdkVersion과 compileSdkVersion은 이미 33+로 되어 있을 테니 그대로 두세요.
     }
 
     buildTypes {
@@ -37,6 +39,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+    ndkVersion = "27.0.12077973"  // 요구되는 NDK 버전으로 업데이트 (뒤로 호환됨)
+
 }
 
 flutter {

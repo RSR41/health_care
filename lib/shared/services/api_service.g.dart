@@ -183,10 +183,15 @@ class _ApiService implements ApiService {
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
     final _data = FormData();
-    _data.files.add(MapEntry(
-      'image',
-      await MultipartFile.fromFile(image.path),
-    ));
+    _data.files.add(
+      MapEntry(
+        'image',
+        MultipartFile.fromFileSync(
+          image.path,
+          filename: image.path.split(Platform.pathSeparator).last,
+        ),
+      ),
+    );
     final _options = _setStreamType<String>(
       Options(
         method: 'POST',
@@ -329,10 +334,15 @@ class _ApiService implements ApiService {
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
     final _data = FormData();
-    _data.files.add(MapEntry(
-      'image',
-      await MultipartFile.fromFile(image.path),
-    ));
+    _data.files.add(
+      MapEntry(
+        'image',
+        MultipartFile.fromFileSync(
+          image.path,
+          filename: image.path.split(Platform.pathSeparator).last,
+        ),
+      ),
+    );
     final _options = _setStreamType<FoodRecognitionResponse>(
       Options(
         method: 'POST',
@@ -507,22 +517,29 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<BodyScanResult> scanBody(
-    File frontImage,
-    File sideImage,
-  ) async {
+  Future<BodyScanResult> scanBody(File frontImage, File sideImage) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
     final _data = FormData();
-    _data.files.add(MapEntry(
-      'frontImage',
-      await MultipartFile.fromFile(frontImage.path),
-    ));
-    _data.files.add(MapEntry(
-      'sideImage',
-      await MultipartFile.fromFile(sideImage.path),
-    ));
+    _data.files.add(
+      MapEntry(
+        'frontImage',
+        MultipartFile.fromFileSync(
+          frontImage.path,
+          filename: frontImage.path.split(Platform.pathSeparator).last,
+        ),
+      ),
+    );
+    _data.files.add(
+      MapEntry(
+        'sideImage',
+        MultipartFile.fromFileSync(
+          sideImage.path,
+          filename: sideImage.path.split(Platform.pathSeparator).last,
+        ),
+      ),
+    );
     final _options = _setStreamType<BodyScanResult>(
       Options(
         method: 'POST',
