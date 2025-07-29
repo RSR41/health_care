@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';  // 새 import 추가 - 이미지 인식 플러그인
 import 'dart:io';
 
 import '../../../shared/providers/app_providers.dart';
@@ -109,14 +110,17 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
               ),
             ),
             const SizedBox(height: 16),
-            
-            // Circular Progress
-            SizedBox(
-              width: 120,
-              height: 120,
-              child: Stack(
-                children: [
-                  CircularProgressIndicator(
+
+            // Circular Progress and Text in a Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center, // Row 내부 요소들을 가로축 중앙에 배치 (선택 사항)
+              crossAxisAlignment: CrossAxisAlignment.center, // Row 내부 요소들을 세로축 중앙에 배치
+              children: [
+                // CircularProgressIndicator on the left
+                SizedBox(
+                  width: 40, // 원 그래프 크기 조절
+                  height: 40, // 원 그래프 크기 조절
+                  child: CircularProgressIndicator(
                     value: 0.65,
                     strokeWidth: 8,
                     backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
@@ -124,29 +128,31 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                       Theme.of(context).colorScheme.primary,
                     ),
                   ),
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '760',
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                        Text(
-                          '/ 1200 kcal',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
+                ),
+                const SizedBox(width: 24), // 그래프와 텍스트 사이 간격
+
+                // Text on the right
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, // 텍스트를 왼쪽 정렬
+                  mainAxisAlignment: MainAxisAlignment.center, // 세로축 중앙 정렬
+                  children: [
+                    Text(
+                      '760',
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                    Text(
+                      '/ 1200 kcal',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            
+            const SizedBox(height: 25),
+
             // Macros
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -511,6 +517,33 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
     );
 
     if (picked == null) return;
+
+    // ML Kit 초기화 (기본 옵션: 싱글 이미지, 분류 활성화)
+    final options = ObjectDetectorOptions(
+      mode: DetectionMode.singleImage,  // 한 장 사진 처리
+      classify: true,  // 물체 분류 (음식 이름 추출)
+      multipleObjects: true,  // 여러 음식 인식
+    );
+    final objectDetector = ObjectDetector(options: options);
+
+    // 사진을 InputImage로 변환 (ML Kit 입력 형식)
+    final inputImage = InputImage.fromFilePath(picked.path);
+
+    // 아직 인식 안 함 – 다음 단계에서
+    final List<DetectedObject> objects = await objectDetector.processImage(inputImage);
+
+    // 임시: 콘솔에 출력 (Android Studio 로그 확인)
+    print('Detected objects: ${objects.length}');
+
+    objectDetector.close();  // 메모리 해제
+
+    // 기존 결과 처리 (다음 단계에서 확장)
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('사진 찍음: ${objects.length} 물체 감지')),
+    );
+
+
 
     final notifier = ref.read(foodRecognitionProvider.notifier);
     await notifier.recognizeFood(File(picked.path));
