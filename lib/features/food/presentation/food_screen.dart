@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';  // 새 import 추가 - 이미지 인식 플러그인
+import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart'; // 새 import 추가 - 이미지 인식 플러그인
 import 'dart:io';
 
 import '../../../shared/providers/app_providers.dart';
@@ -106,15 +106,17 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
             Text(
               '오늘의 칼로리',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 16),
 
             // Circular Progress and Text in a Row
             Row(
-              mainAxisAlignment: MainAxisAlignment.center, // Row 내부 요소들을 가로축 중앙에 배치 (선택 사항)
-              crossAxisAlignment: CrossAxisAlignment.center, // Row 내부 요소들을 세로축 중앙에 배치
+              mainAxisAlignment:
+                  MainAxisAlignment.center, // Row 내부 요소들을 가로축 중앙에 배치 (선택 사항)
+              crossAxisAlignment:
+                  CrossAxisAlignment.center, // Row 내부 요소들을 세로축 중앙에 배치
               children: [
                 // CircularProgressIndicator on the left
                 SizedBox(
@@ -123,7 +125,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                   child: CircularProgressIndicator(
                     value: 0.65,
                     strokeWidth: 8,
-                    backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+                    backgroundColor:
+                        Theme.of(context).colorScheme.surfaceVariant,
                     valueColor: AlwaysStoppedAnimation<Color>(
                       Theme.of(context).colorScheme.primary,
                     ),
@@ -138,10 +141,11 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                   children: [
                     Text(
                       '760',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
                     ),
                     Text(
                       '/ 1200 kcal',
@@ -168,7 +172,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
     );
   }
 
-  Widget _buildMacroInfo(String name, String amount, String percentage, Color color) {
+  Widget _buildMacroInfo(
+      String name, String amount, String percentage, Color color) {
     return Column(
       children: [
         Text(
@@ -179,23 +184,25 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
         Text(
           amount,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
         ),
         Text(
           percentage,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: color,
-          ),
+                color: color,
+              ),
         ),
       ],
     );
   }
 
-  Widget _buildMealSection(String mealName, IconData icon, List<Map<String, dynamic>> foods) {
-    final totalCalories = foods.fold<int>(0, (sum, food) => sum + (food['calories'] as int));
-    
+  Widget _buildMealSection(
+      String mealName, IconData icon, List<Map<String, dynamic>> foods) {
+    final totalCalories =
+        foods.fold<int>(0, (sum, food) => sum + (food['calories'] as int));
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -209,30 +216,33 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                 Text(
                   mealName,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
                 const Spacer(),
                 Text(
                   '${totalCalories} kcal',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            
             if (foods.isEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceVariant
+                      .withOpacity(0.5),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                    color:
+                        Theme.of(context).colorScheme.outline.withOpacity(0.3),
                     style: BorderStyle.solid,
                   ),
                 ),
@@ -247,57 +257,71 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                     Text(
                       '음식을 추가해보세요',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ],
                 ),
               )
             else
-              ...foods.map((food) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceVariant,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.restaurant,
-                        size: 20,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            food['name'] as String,
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w500,
+              ...foods
+                  .map((food) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceVariant,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.restaurant,
+                                size: 20,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
                             ),
-                          ),
-                          Text(
-                            food['time'] as String,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      '${food['calories']} kcal',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              )).toList(),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    food['name'] as String,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                  ),
+                                  Text(
+                                    food['time'] as String,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              '${food['calories']} kcal',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ))
+                  .toList(),
           ],
         ),
       ),
@@ -320,8 +344,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                   Text(
                     '주간 칼로리 추이',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 16),
                   Container(
@@ -331,8 +355,10 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                         '차트 영역\n(실제 구현 시 charts_flutter 패키지 사용)',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                       ),
                     ),
                   ),
@@ -352,8 +378,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                   Text(
                     '영양소 분석',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 16),
                   _buildNutritionBar('탄수화물', 0.6, Colors.orange),
@@ -379,8 +405,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                   Text(
                     'AI 추천',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 16),
                   _buildRecommendationItem(
@@ -415,15 +441,15 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
             Text(
               name,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+                    fontWeight: FontWeight.w500,
+                  ),
             ),
             Text(
               '${(progress * 100).toInt()}%',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
           ],
         ),
@@ -437,7 +463,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
     );
   }
 
-  Widget _buildRecommendationItem(String title, String description, IconData icon, Color color) {
+  Widget _buildRecommendationItem(
+      String title, String description, IconData icon, Color color) {
     return Row(
       children: [
         Container(
@@ -456,14 +483,14 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
               Text(
                 title,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
               Text(
                 description,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
             ],
           ),
@@ -477,16 +504,15 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
       padding: const EdgeInsets.all(16),
       itemCount: 7,
       itemBuilder: (context, index) {
-        final dates = [
-          '오늘', '어제', '2일 전', '3일 전', '4일 전', '5일 전', '6일 전'
-        ];
+        final dates = ['오늘', '어제', '2일 전', '3일 전', '4일 전', '5일 전', '6일 전'];
         final calories = [760, 1180, 1050, 1320, 980, 1150, 1200];
-        
+
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              backgroundColor:
+                  Theme.of(context).colorScheme.primary.withOpacity(0.1),
               child: Icon(
                 Icons.calendar_today,
                 color: Theme.of(context).colorScheme.primary,
@@ -496,8 +522,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
             title: Text(
               dates[index],
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             subtitle: Text('총 ${calories[index]} kcal'),
             trailing: Icon(Icons.chevron_right),
@@ -520,9 +546,9 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
 
     // ML Kit 초기화 (기본 옵션: 싱글 이미지, 분류 활성화)
     final options = ObjectDetectorOptions(
-      mode: DetectionMode.singleImage,  // 한 장 사진 처리
-      classify: true,  // 물체 분류 (음식 이름 추출)
-      multipleObjects: true,  // 여러 음식 인식
+      mode: DetectionMode.single, // 한 장 사진 처리
+      classifyObjects: true, // 물체 분류 (음식 이름 추출)
+      multipleObjects: true, // 여러 음식 인식
     );
     final objectDetector = ObjectDetector(options: options);
 
@@ -530,12 +556,38 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
     final inputImage = InputImage.fromFilePath(picked.path);
 
     // 아직 인식 안 함 – 다음 단계에서
-    final List<DetectedObject> objects = await objectDetector.processImage(inputImage);
+    final List<DetectedObject> objects =
+        await objectDetector.processImage(inputImage);
 
     // 임시: 콘솔에 출력 (Android Studio 로그 확인)
     print('Detected objects: ${objects.length}');
 
-    objectDetector.close();  // 메모리 해제
+    List<String> foodNames = [];
+    for (var obj in objects) {
+      for (var label in obj.labels) {
+        if (label.confidence > 0.5) {
+          // 신뢰도 50% 이상만
+          foodNames.add(label.text); // 음식 이름 (예: "banana")
+        }
+      }
+    }
+
+    // 결과 출력
+    if (foodNames.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('음식 인식 실패')),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        builder: (_) => ListView(
+          children:
+              foodNames.map((name) => ListTile(title: Text(name))).toList(),
+        ),
+      );
+    }
+
+    objectDetector.close(); // 메모리 해제
 
     // 기존 결과 처리 (다음 단계에서 확장)
     if (!mounted) return;
@@ -543,33 +595,10 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
       SnackBar(content: Text('사진 찍음: ${objects.length} 물체 감지')),
     );
 
-
-
     final notifier = ref.read(foodRecognitionProvider.notifier);
     await notifier.recognizeFood(File(picked.path));
 
     final result = ref.read(foodRecognitionProvider);
-
-    if (!mounted) return;
-
-    if (result.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('인식 실패: ${result.error}')),
-      );
-      return;
-    }
-
-    if (result.recognizedFoods.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('인식된 음식이 없습니다')),
-      );
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => _RecognitionResultSheet(foods: result.recognizedFoods),
-    );
   }
 
   void _showAddFoodDialog() {
@@ -583,8 +612,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
             Text(
               '음식 추가하기',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 24),
             Row(
@@ -655,4 +684,3 @@ class _RecognitionResultSheet extends StatelessWidget {
     );
   }
 }
-
