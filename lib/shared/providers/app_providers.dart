@@ -9,6 +9,9 @@ import '../../core/constants/app_constants.dart';
 import '../../features/weather/services/weather_service.dart';
 import '../../features/ai/services/ai_service.dart';
 
+// 음식인식
+final recognizedFoodsProvider = StateProvider<List<Map<String, dynamic>>>((ref) => []);
+
 // Dio Provider
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(BaseOptions(

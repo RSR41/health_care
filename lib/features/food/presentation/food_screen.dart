@@ -7,6 +7,19 @@ import 'dart:io';
 import '../../../shared/providers/app_providers.dart';
 import '../../../shared/services/api_service.dart';
 
+
+// FoodScreen.dart 위에 추가 (class 밖)
+final Map<String, Map<String, double>> nutritionData = {
+  'food': {'calories': 100, 'protein': 5.0, 'fat': 2.0, 'carbs': 20.0},  // "Food" 라벨용 임시 데이터
+  'apple': {'calories': 52, 'protein': 0.3, 'fat': 0.2, 'carbs': 14.0},
+  'banana': {'calories': 89, 'protein': 1.1, 'fat': 0.3, 'carbs': 23.0},
+  // 더 추가: 실제 값은 Google 검색으로 채우기 (예: USDA Food Database)
+};
+
+extension StringExt on String {
+  String capitalize() => length > 0 ? this[0].toUpperCase() + substring(1) : this;
+}
+
 class FoodScreen extends ConsumerStatefulWidget {
   const FoodScreen({super.key});
 
@@ -536,6 +549,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
     );
   }
 
+// ... 기존 import 유지
+
   Future<void> _captureAndRecognize() async {
     final XFile? picked = await _picker.pickImage(
       source: ImageSource.camera,
@@ -544,63 +559,104 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
 
     if (picked == null) return;
 
-    // ML Kit 초기화 (기본 옵션: 싱글 이미지, 분류 활성화)
+    // ML Kit 옵션 (기존에서 유지)
     final options = ObjectDetectorOptions(
-      mode: DetectionMode.single, // 한 장 사진 처리
-      classifyObjects: true, // 물체 분류 (음식 이름 추출)
-      multipleObjects: true, // 여러 음식 인식
+      mode: DetectionMode.single,
+      classifyObjects: true,
+      multipleObjects: true,
     );
     final objectDetector = ObjectDetector(options: options);
 
-    // 사진을 InputImage로 변환 (ML Kit 입력 형식)
     final inputImage = InputImage.fromFilePath(picked.path);
 
-    // 아직 인식 안 함 – 다음 단계에서
-    final List<DetectedObject> objects =
-        await objectDetector.processImage(inputImage);
+    final List<DetectedObject> objects = await objectDetector.processImage(inputImage);
 
-    // 임시: 콘솔에 출력 (Android Studio 로그 확인)
-    print('Detected objects: ${objects.length}');
-
-    List<String> foodNames = [];
+    // 라벨 추출 및 중복 제거 (Set 사용: 중복 이름 피함)
+    Set<String> foodNames = {};  // Set으로 변경 – 자동 중복 제거
     for (var obj in objects) {
       for (var label in obj.labels) {
-        if (label.confidence > 0.5) {
-          // 신뢰도 50% 이상만
-          foodNames.add(label.text); // 음식 이름 (예: "banana")
+        if (label.confidence > 0.5) {  // 신뢰도 50% 이상 필터
+          foodNames.add(label.text.toLowerCase());  // 소문자로 통일, 추가
         }
       }
     }
 
-    // 결과 출력
-    if (foodNames.isEmpty) {
+    objectDetector.close();
+
+    List<Map<String, dynamic>> recognizedFoods = [];
+    for (var name in foodNames) {
+      String lowerName = name.toLowerCase();
+      if (nutritionData.containsKey(lowerName)) {
+        recognizedFoods.add({
+          'name': name.capitalize(),
+          'calories': nutritionData[lowerName]!['calories'],
+          'protein': nutritionData[lowerName]!['protein'],
+          'fat': nutritionData[lowerName]!['fat'],
+          'carbs': nutritionData[lowerName]!['carbs'],
+        });
+      } else {
+        // 알 수 없는 라벨 처리 (예: "Food"가 매핑됐지만 세부 없음)
+        recognizedFoods.add({
+          'name': name.capitalize(),
+          'calories': 0.0,  // 기본값
+          'protein': 0.0,
+          'fat': 0.0,
+          'carbs': 0.0,
+        });
+      }
+    }
+
+    // 바텀시트 업데이트
+    if (recognizedFoods.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('음식 인식 실패')),
+        const SnackBar(content: Text('영양소 매핑 실패 – 인식된 음식 없음')),
       );
     } else {
       showModalBottomSheet(
         context: context,
-        builder: (_) => ListView(
-          children:
-              foodNames.map((name) => ListTile(title: Text(name))).toList(),
+        builder: (_) => ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: recognizedFoods.length,
+          itemBuilder: (_, index) {
+            var food = recognizedFoods[index];
+            return ListTile(
+              title: Text(food['name']),
+              subtitle: Text(
+                  '칼로리: ${food['calories']} kcal | 단백질: ${food['protein']} g | 지방: ${food['fat']} g | 탄수화물: ${food['carbs']} g'
+              ),
+            );
+          },
         ),
       );
     }
 
-    objectDetector.close(); // 메모리 해제
+    // 로그 추가
+    print('Recognized foods with nutrition: $recognizedFoods');
 
-    // 기존 결과 처리 (다음 단계에서 확장)
+    // 결과 처리
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('사진 찍음: ${objects.length} 물체 감지')),
-    );
 
-    final notifier = ref.read(foodRecognitionProvider.notifier);
-    await notifier.recognizeFood(File(picked.path));
+    if (foodNames.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('음식 인식 실패 – 물체 없음')),
+      );
+    } else {
+      // 바텀시트에 라벨 목록 표시 (중복 없음)
+      showModalBottomSheet(
+        context: context,
+        builder: (_) => ListView(
+          padding: const EdgeInsets.all(16),
+          children: foodNames.map((name) => ListTile(
+            title: Text(name.capitalize()),  // 첫 글자 대문자 (UI 예쁘게)
+            subtitle: Text('감지됨'),  // 추가 설명
+          )).toList(),
+        ),
+      );
+    }
 
-    final result = ref.read(foodRecognitionProvider);
+    // 로그 추가: 디버그 용도
+    print('Detected foods: $foodNames');
   }
-
   void _showAddFoodDialog() {
     showModalBottomSheet(
       context: context,
