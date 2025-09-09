@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart'; // 새 import 추가 - 이미지 인식 플러그인
+import '../../../core/vision/detector.dart';
+import '../../../core/vision/ultralytics_yolo_detector.dart';
+import '../../../core/vision/mock_detector.dart';
+import '../../food/services/nutrition_repository.dart';
+import '../../../core/vision/detection.dart';
+import 'dart:ui' as ui;
 import 'dart:io';
 
 import '../../../shared/providers/app_providers.dart';
@@ -31,17 +36,33 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final ImagePicker _picker = ImagePicker();
+  final NutritionRepository _nutritionRepo = NutritionRepository();
+  late VisionDetector _detector;
+  bool _detectorReady = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _initializeDetector();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _detector.dispose();
     super.dispose();
+  }
+
+  Future<void> _initializeDetector() async {
+    try {
+      _detector = UltralyticsYoloDetector(modelPath: 'yolo11n');
+      await _detector.load();
+    } catch (_) {
+      _detector = MockDetector();
+      await _detector.load();
+    }
+    if (mounted) setState(() => _detectorReady = _detector.isLoaded);
   }
 
   @override
@@ -68,7 +89,7 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          _showAddFoodDialog();
+          _pickAndRecognize(ImageSource.camera);
         },
         child: const Icon(Icons.camera_alt),
       ),
@@ -549,114 +570,6 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
     );
   }
 
-// ... 기존 import 유지
-
-  Future<void> _captureAndRecognize() async {
-    final XFile? picked = await _picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 80,
-    );
-
-    if (picked == null) return;
-
-    // ML Kit 옵션 (기존에서 유지)
-    final options = ObjectDetectorOptions(
-      mode: DetectionMode.single,
-      classifyObjects: true,
-      multipleObjects: true,
-    );
-    final objectDetector = ObjectDetector(options: options);
-
-    final inputImage = InputImage.fromFilePath(picked.path);
-
-    final List<DetectedObject> objects = await objectDetector.processImage(inputImage);
-
-    // 라벨 추출 및 중복 제거 (Set 사용: 중복 이름 피함)
-    Set<String> foodNames = {};  // Set으로 변경 – 자동 중복 제거
-    for (var obj in objects) {
-      for (var label in obj.labels) {
-        if (label.confidence > 0.5) {  // 신뢰도 50% 이상 필터
-          foodNames.add(label.text.toLowerCase());  // 소문자로 통일, 추가
-        }
-      }
-    }
-
-    objectDetector.close();
-
-    List<Map<String, dynamic>> recognizedFoods = [];
-    for (var name in foodNames) {
-      String lowerName = name.toLowerCase();
-      if (nutritionData.containsKey(lowerName)) {
-        recognizedFoods.add({
-          'name': name.capitalize(),
-          'calories': nutritionData[lowerName]!['calories'],
-          'protein': nutritionData[lowerName]!['protein'],
-          'fat': nutritionData[lowerName]!['fat'],
-          'carbs': nutritionData[lowerName]!['carbs'],
-        });
-      } else {
-        // 알 수 없는 라벨 처리 (예: "Food"가 매핑됐지만 세부 없음)
-        recognizedFoods.add({
-          'name': name.capitalize(),
-          'calories': 0.0,  // 기본값
-          'protein': 0.0,
-          'fat': 0.0,
-          'carbs': 0.0,
-        });
-      }
-    }
-
-    // 바텀시트 업데이트
-    if (recognizedFoods.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('영양소 매핑 실패 – 인식된 음식 없음')),
-      );
-    } else {
-      showModalBottomSheet(
-        context: context,
-        builder: (_) => ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: recognizedFoods.length,
-          itemBuilder: (_, index) {
-            var food = recognizedFoods[index];
-            return ListTile(
-              title: Text(food['name']),
-              subtitle: Text(
-                  '칼로리: ${food['calories']} kcal | 단백질: ${food['protein']} g | 지방: ${food['fat']} g | 탄수화물: ${food['carbs']} g'
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    // 로그 추가
-    print('Recognized foods with nutrition: $recognizedFoods');
-
-    // 결과 처리
-    if (!mounted) return;
-
-    if (foodNames.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('음식 인식 실패 – 물체 없음')),
-      );
-    } else {
-      // 바텀시트에 라벨 목록 표시 (중복 없음)
-      showModalBottomSheet(
-        context: context,
-        builder: (_) => ListView(
-          padding: const EdgeInsets.all(16),
-          children: foodNames.map((name) => ListTile(
-            title: Text(name.capitalize()),  // 첫 글자 대문자 (UI 예쁘게)
-            subtitle: Text('감지됨'),  // 추가 설명
-          )).toList(),
-        ),
-      );
-    }
-
-    // 로그 추가: 디버그 용도
-    print('Detected foods: $foodNames');
-  }
   void _showAddFoodDialog() {
     showModalBottomSheet(
       context: context,
@@ -678,7 +591,7 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
-                      _captureAndRecognize();
+                      _pickAndRecognize(ImageSource.camera);
                     },
                     icon: const Icon(Icons.camera_alt),
                     label: const Text('사진 촬영'),
@@ -702,6 +615,177 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
           ],
         ),
       ),
+    );
+  }
+  // YOLO 기반 인식 실행 및 결과 편집 시트 표시
+  Future<void> _pickAndRecognize(ImageSource source) async {
+    final XFile? picked = await _picker.pickImage(source: source, imageQuality: 85);
+    if (picked == null) return;
+
+    if (!_detectorReady) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('인식 엔진 준비 중입니다. 잠시 후 다시 시도하세요.')),
+      );
+      return;
+    }
+
+    final detections = await _detector.detect(File(picked.path));
+    if (detections.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('음식을 감지하지 못했습니다. 조명/각도를 바꿔 다시 시도하세요.')),
+      );
+      return;
+    }
+
+    // 원본 이미지 크기 파악
+    final bytes = await File(picked.path).readAsBytes();
+    final imgInfo = await ui.decodeImageFromList(bytes);
+    final imgW = imgInfo.width.toDouble();
+    final imgH = imgInfo.height.toDouble();
+
+    // 바운딩박스 면적 비율에 따른 초기 분량 추정
+    final items = <RecognizedFoodItem>[];
+    for (final d in detections) {
+      final area = d.bbox.width * d.bbox.height;
+      final ratio = area / (imgW * imgH + 1);
+      int grams = ratio > 0.25 ? 300 : (ratio > 0.12 ? 200 : 120);
+
+      final per100 = await _nutritionRepo.findPer100g(d.label) ??
+          const NutritionPer100g(kcal: 0, carbs: 0, protein: 0, fat: 0, fiber: 0);
+
+      items.add(
+        RecognizedFoodItem(
+          label: d.label,
+          confidence: d.score,
+          grams: grams,
+          kcalPer100g: per100.kcal,
+          carbsPer100g: per100.carbs,
+          proteinPer100g: per100.protein,
+          fatPer100g: per100.fat,
+        ),
+      );
+    }
+
+    if (!mounted) return;
+    _showRecognitionEditSheet(items);
+  }
+
+  void _showRecognitionEditSheet(List<RecognizedFoodItem> items) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setModalState) {
+          double totalKcal = items.fold(0, (s, e) => s + e.calories);
+          double totalCarbs = items.fold(0, (s, e) => s + e.carbs);
+          double totalProtein = items.fold(0, (s, e) => s + e.protein);
+          double totalFat = items.fold(0, (s, e) => s + e.fat);
+
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text('인식 결과 확인', style: Theme.of(context).textTheme.titleLarge),
+                      const Spacer(),
+                      if (!_detectorReady)
+                        const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ...items.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final item = entry.value;
+                    return Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text('${item.label}  ', style: Theme.of(context).textTheme.titleMedium),
+                                Text('(${(item.confidence * 100).toStringAsFixed(0)}%)',
+                                    style: Theme.of(context).textTheme.bodySmall),
+                                const Spacer(),
+                                Text('${item.calories.toStringAsFixed(0)} kcal',
+                                    style: Theme.of(context).textTheme.titleSmall),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Slider(
+                                    value: item.grams.toDouble(),
+                                    min: 40,
+                                    max: 500,
+                                    divisions: 46,
+                                    label: '${item.grams} g',
+                                    onChanged: (v) {
+                                      setModalState(() {
+                                        items[idx] = item.copyWith(grams: v.round());
+                                      });
+                                    },
+                                  ),
+                                ),
+                                SizedBox(width: 64, child: Text('${item.grams} g')),
+                              ],
+                            ),
+                            Text(
+                              '탄수화물 ${item.carbs.toStringAsFixed(1)}g · 단백질 ${item.protein.toStringAsFixed(1)}g · 지방 ${item.fat.toStringAsFixed(1)}g',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text('합계', style: Theme.of(context).textTheme.titleMedium),
+                      const Spacer(),
+                      Text('${totalKcal.toStringAsFixed(0)} kcal', style: Theme.of(context).textTheme.titleMedium),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '탄 ${totalCarbs.toStringAsFixed(1)}g · 단 ${totalProtein.toStringAsFixed(1)}g · 지 ${totalFat.toStringAsFixed(1)}g',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('임시 저장 완료 (서버/챗봇 연동 준비)')),
+                        );
+                        // TODO: 서버 저장(/food/entries) 및 챗봇 컨텍스트 푸시
+                      },
+                      icon: const Icon(Icons.save),
+                      label: const Text('저장'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        });
+      },
     );
   }
 }

@@ -51,8 +51,7 @@ dependencies:
   image: ^4.2.0
   
   # ML/AI
-  tflite_flutter: ^0.11.0
-  google_mlkit_object_detection: ^0.15.0
+  ultralytics_yolo: ^0.1.26
   
   # Social Login
   google_sign_in: ^6.2.1
@@ -62,9 +61,9 @@ dependencies:
   http: ^1.2.2
   geolocator: ^14.0.1
   
-  # OCR and Text Recognition
-  google_mlkit_text_recognition: ^0.15.0
-  google_mlkit_barcode_scanning: ^0.14.1
+  # OCR and Text Recognition (removed unused ML Kit packages)
+  # google_mlkit_text_recognition: ^0.15.0
+  # google_mlkit_barcode_scanning: ^0.14.1
   
   # Utilities
   intl: ^0.20.2
@@ -100,6 +99,7 @@ flutter:
     - assets/images/
     - assets/models/
     - assets/lottie/
+    - assets/nutrition/
   
   fonts:
     - family: Pretendard
