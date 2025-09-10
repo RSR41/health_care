@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
-import 'package:tflite_flutter/tflite_flutter.dart';
+// TFLite removed - using mock implementation
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:collection/collection.dart';
@@ -74,7 +74,8 @@ class AIServiceState {
 class AIService extends StateNotifier<AIServiceState> {
   final Dio _dio;
   final ApiService _apiService;
-  Interpreter? _gemmaInterpreter;
+  // TFLite interpreter removed - using mock implementation
+  bool _isGemmaLoaded = false;
   String? _openAIApiKey;
   String? _exaoneApiKey;
 
@@ -140,8 +141,8 @@ class AIService extends StateNotifier<AIServiceState> {
       // 모델 파일 생성 (실제로는 다운로드)
       await File(modelPath).writeAsBytes(Uint8List(0));
 
-      // 인터프리터 로드
-      _gemmaInterpreter = await Interpreter.fromFile(File(modelPath));
+      // Mock interpreter load - in production, use actual TFLite
+      _isGemmaLoaded = true;
 
       final availability = Map<AIModelType, bool>.from(state.modelAvailability);
       availability[AIModelType.gemma] = true;
@@ -199,7 +200,7 @@ class AIService extends StateNotifier<AIServiceState> {
   }
 
   Future<AIResponse> _processWithGemma(String message, Map<String, dynamic>? context) async {
-    if (_gemmaInterpreter == null) {
+    if (!_isGemmaLoaded) {
       throw Exception('Gemma 모델이 로드되지 않았습니다');
     }
 
@@ -404,7 +405,8 @@ String _buildSystemPrompt(Map<String, dynamic>? context) {
 
   @override
   void dispose() {
-    _gemmaInterpreter?.close();
+    // TFLite cleanup removed
+    _isGemmaLoaded = false;
     super.dispose();
   }
 }

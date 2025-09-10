@@ -1,0 +1,8 @@
+{
+  "apple": {"kcal_per_100g": 52, "carbs_g": 14.0, "protein_g": 0.3, "fat_g": 0.2, "fiber_g": 2.4},
+  "banana": {"kcal_per_100g": 89, "carbs_g": 23.0, "protein_g": 1.1, "fat_g": 0.3, "fiber_g": 2.6},
+  "kimchi": {"kcal_per_100g": 15, "carbs_g": 2.4, "protein_g": 1.1, "fat_g": 0.5, "fiber_g": 1.6},
+  "ramen": {"kcal_per_100g": 436, "carbs_g": 66.0, "protein_g": 10.0, "fat_g": 15.0, "fiber_g": 3.0},
+  "bibimbap": {"kcal_per_100g": 169, "carbs_g": 26.0, "protein_g": 5.6, "fat_g": 4.5, "fiber_g": 2.8}
+}
+

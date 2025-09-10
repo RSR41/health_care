@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+// ML Kit dependency removed - using mock implementation
 import 'dart:io';
 
 class CosmeticsScreen extends ConsumerStatefulWidget {
@@ -13,7 +13,7 @@ class CosmeticsScreen extends ConsumerStatefulWidget {
 
 class _CosmeticsScreenState extends ConsumerState<CosmeticsScreen> {
   final ImagePicker _picker = ImagePicker();
-  final TextRecognizer _textRecognizer = TextRecognizer();
+  // ML Kit removed - using mock implementation
   
   List<CosmeticProduct> _products = [];
   List<String> _userAllergies = ['파라벤', '황산염', '인공향료'];
@@ -21,7 +21,7 @@ class _CosmeticsScreenState extends ConsumerState<CosmeticsScreen> {
 
   @override
   void dispose() {
-    _textRecognizer.close();
+    // ML Kit cleanup removed
     super.dispose();
   }
 
@@ -38,10 +38,9 @@ class _CosmeticsScreenState extends ConsumerState<CosmeticsScreen> {
         _isProcessing = true;
       });
 
-      final inputImage = InputImage.fromFilePath(image.path);
-      final recognizedText = await _textRecognizer.processImage(inputImage);
-      
-      await _processIngredients(recognizedText.text);
+      // Mock implementation - in production, use a proper OCR service
+      // For now, simulate text extraction
+      await _processMockIngredients(image.path);
     } catch (e) {
       _showError('스캔 중 오류가 발생했습니다: $e');
     } finally {
@@ -49,6 +48,15 @@ class _CosmeticsScreenState extends ConsumerState<CosmeticsScreen> {
         _isProcessing = false;
       });
     }
+  }
+
+  Future<void> _processMockIngredients(String imagePath) async {
+    // Simulate processing delay
+    await Future.delayed(const Duration(seconds: 1));
+    
+    // Mock ingredient extraction - in production, use actual OCR service
+    final mockText = "Water, Glycerin, Niacinamide, Hyaluronic Acid";
+    await _processIngredients(mockText);
   }
 
   Future<void> _processIngredients(String text) async {

@@ -12,7 +12,7 @@ abstract class ParseErrorLogger {
   void logError(Object error, StackTrace stackTrace, RequestOptions options);
 }
 
-@RestApi(baseUrl: 'https://api.signcare.com/v1')
+@RestApi(baseUrl: 'http://192.168.0.71:3000/api') // 서버 컴퓨터의 실제 IP 주소로 변경 필요
 abstract class ApiService {
   factory ApiService(
     Dio dio, {
@@ -201,52 +201,112 @@ class AuthResponse {
 }
 
 class FoodRecognitionResponse {
-  final List<FoodItem> recognizedFoods;
-  final double confidence;
+  final bool success;
+  final List<FoodItem> foods;
+  final String? imageUrl;
+  final String? processedAt;
 
   FoodRecognitionResponse({
-    required this.recognizedFoods,
-    required this.confidence,
+    required this.success,
+    required this.foods,
+    this.imageUrl,
+    this.processedAt,
   });
 
   factory FoodRecognitionResponse.fromJson(Map<String, dynamic> json) {
     return FoodRecognitionResponse(
-      recognizedFoods: (json['recognized_foods'] as List)
+      success: json['success'] as bool? ?? false,
+      foods: (json['foods'] as List? ?? [])
           .map((e) => FoodItem.fromJson(e as Map<String, dynamic>))
           .toList(),
-      confidence: (json['confidence'] as num).toDouble(),
+      imageUrl: json['imageUrl'] as String?,
+      processedAt: json['processedAt'] as String?,
     );
   }
 }
 
 class FoodItem {
-  final String id;
   final String name;
-  final double caloriesPerGram;
-  final double carbsPerGram;
-  final double proteinPerGram;
-  final double fatPerGram;
-  final double fiberPerGram;
+  final double confidence;
+  final BoundingBox? bbox;
+  final NutritionInfo? nutrition;
 
   FoodItem({
-    required this.id,
     required this.name,
-    required this.caloriesPerGram,
-    required this.carbsPerGram,
-    required this.proteinPerGram,
-    required this.fatPerGram,
-    required this.fiberPerGram,
+    required this.confidence,
+    this.bbox,
+    this.nutrition,
   });
 
   factory FoodItem.fromJson(Map<String, dynamic> json) {
     return FoodItem(
-      id: json['id'] as String,
       name: json['name'] as String,
-      caloriesPerGram: (json['calories_per_gram'] as num).toDouble(),
-      carbsPerGram: (json['carbs_per_gram'] as num).toDouble(),
-      proteinPerGram: (json['protein_per_gram'] as num).toDouble(),
-      fatPerGram: (json['fat_per_gram'] as num).toDouble(),
-      fiberPerGram: (json['fiber_per_gram'] as num).toDouble(),
+      confidence: (json['confidence'] as num).toDouble(),
+      bbox: json['bbox'] != null
+          ? BoundingBox.fromJson(json['bbox'] as Map<String, dynamic>)
+          : null,
+      nutrition: json['nutrition'] != null
+          ? NutritionInfo.fromJson(json['nutrition'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+
+  // 100g당 칼로리 (기존 코드 호환성)
+  double get caloriesPerGram => (nutrition?.calories ?? 0) / 100;
+  double get carbsPerGram => (nutrition?.carbohydrates ?? 0) / 100;
+  double get proteinPerGram => (nutrition?.protein ?? 0) / 100;
+  double get fatPerGram => (nutrition?.fat ?? 0) / 100;
+  double get fiberPerGram => (nutrition?.fiber ?? 0) / 100;
+}
+
+class BoundingBox {
+  final double x;
+  final double y;
+  final double width;
+  final double height;
+
+  BoundingBox({
+    required this.x,
+    required this.y,
+    required this.width,
+    required this.height,
+  });
+
+  factory BoundingBox.fromJson(Map<String, dynamic> json) {
+    return BoundingBox(
+      x: (json['x'] as num).toDouble(),
+      y: (json['y'] as num).toDouble(),
+      width: (json['width'] as num).toDouble(),
+      height: (json['height'] as num).toDouble(),
+    );
+  }
+}
+
+class NutritionInfo {
+  final double calories;
+  final double protein;
+  final double fat;
+  final double carbohydrates;
+  final double fiber;
+  final double sodium;
+
+  NutritionInfo({
+    required this.calories,
+    required this.protein,
+    required this.fat,
+    required this.carbohydrates,
+    required this.fiber,
+    required this.sodium,
+  });
+
+  factory NutritionInfo.fromJson(Map<String, dynamic> json) {
+    return NutritionInfo(
+      calories: (json['calories'] as num?)?.toDouble() ?? 0.0,
+      protein: (json['protein'] as num?)?.toDouble() ?? 0.0,
+      fat: (json['fat'] as num?)?.toDouble() ?? 0.0,
+      carbohydrates: (json['carbohydrates'] as num?)?.toDouble() ?? 0.0,
+      fiber: (json['fiber'] as num?)?.toDouble() ?? 0.0,
+      sodium: (json['sodium'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
@@ -583,5 +643,162 @@ class Notification {
       isRead: json['is_read'] as bool,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
+  }
+}
+
+// Food Entry Models (Node.js 서버 호환)
+class FoodEntry {
+  final String? id;
+  final String userId;
+  final String foodName;
+  final int grams;
+  final String mealType; // breakfast, lunch, dinner, snack
+  final DateTime recordedAt;
+
+  FoodEntry({
+    this.id,
+    required this.userId,
+    required this.foodName,
+    required this.grams,
+    required this.mealType,
+    required this.recordedAt,
+  });
+
+  factory FoodEntry.fromJson(Map<String, dynamic> json) {
+    return FoodEntry(
+      id: json['id']?.toString(),
+      userId: json['user_id'] as String,
+      foodName: json['food_name'] as String,
+      grams: json['grams'] as int,
+      mealType: json['meal_type'] as String,
+      recordedAt: DateTime.parse(json['recorded_at'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user_id': userId,
+      'food_name': foodName,
+      'grams': grams,
+      'meal_type': mealType,
+      'recorded_at': recordedAt.toIso8601String(),
+    };
+  }
+}
+
+class ExerciseEntry {
+  final String? id;
+  final String userId;
+  final String exerciseName;
+  final int durationMinutes;
+  final double? caloriesBurned;
+  final DateTime recordedAt;
+
+  ExerciseEntry({
+    this.id,
+    required this.userId,
+    required this.exerciseName,
+    required this.durationMinutes,
+    this.caloriesBurned,
+    required this.recordedAt,
+  });
+
+  factory ExerciseEntry.fromJson(Map<String, dynamic> json) {
+    return ExerciseEntry(
+      id: json['id']?.toString(),
+      userId: json['user_id'] as String,
+      exerciseName: json['exercise_name'] as String,
+      durationMinutes: json['duration_minutes'] as int,
+      caloriesBurned: (json['calories_burned'] as num?)?.toDouble(),
+      recordedAt: DateTime.parse(json['recorded_at'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user_id': userId,
+      'exercise_name': exerciseName,
+      'duration_minutes': durationMinutes,
+      'calories_burned': caloriesBurned,
+      'recorded_at': recordedAt.toIso8601String(),
+    };
+  }
+}
+
+class BodyMeasurement {
+  final String? id;
+  final String userId;
+  final double? weight;
+  final double? height;
+  final double? bodyFatPercentage;
+  final DateTime measuredAt;
+
+  BodyMeasurement({
+    this.id,
+    required this.userId,
+    this.weight,
+    this.height,
+    this.bodyFatPercentage,
+    required this.measuredAt,
+  });
+
+  factory BodyMeasurement.fromJson(Map<String, dynamic> json) {
+    return BodyMeasurement(
+      id: json['id']?.toString(),
+      userId: json['user_id'] as String,
+      weight: (json['weight'] as num?)?.toDouble(),
+      height: (json['height'] as num?)?.toDouble(),
+      bodyFatPercentage: (json['body_fat_percentage'] as num?)?.toDouble(),
+      measuredAt: DateTime.parse(json['measured_at'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user_id': userId,
+      'weight': weight,
+      'height': height,
+      'body_fat_percentage': bodyFatPercentage,
+      'measured_at': measuredAt.toIso8601String(),
+    };
+  }
+}
+
+class SleepData {
+  final String? id;
+  final String userId;
+  final DateTime bedtime;
+  final DateTime wakeupTime;
+  final int sleepDurationMinutes;
+  final double sleepEfficiency;
+
+  SleepData({
+    this.id,
+    required this.userId,
+    required this.bedtime,
+    required this.wakeupTime,
+    required this.sleepDurationMinutes,
+    required this.sleepEfficiency,
+  });
+
+  factory SleepData.fromJson(Map<String, dynamic> json) {
+    return SleepData(
+      id: json['id']?.toString(),
+      userId: json['user_id'] as String,
+      bedtime: DateTime.parse(json['bedtime'] as String),
+      wakeupTime: DateTime.parse(json['wakeup_time'] as String),
+      sleepDurationMinutes: json['sleep_duration_minutes'] as int,
+      sleepEfficiency: (json['sleep_efficiency'] as num).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user_id': userId,
+      'bedtime': bedtime.toIso8601String(),
+      'wakeup_time': wakeupTime.toIso8601String(),
+      'sleep_duration_minutes': sleepDurationMinutes,
+      'sleep_efficiency': sleepEfficiency,
+    };
   }
 }

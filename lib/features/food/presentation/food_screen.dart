@@ -1,10 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../core/vision/detector.dart';
+import '../../../core/vision/yolo_view_detector.dart';
+import '../../../core/vision/mock_detector.dart';
+import '../../food/services/nutrition_repository.dart';
+import '../../../core/vision/detection.dart';
+import 'dart:ui' as ui;
 import 'dart:io';
 
 import '../../../shared/providers/app_providers.dart';
 import '../../../shared/services/api_service.dart';
+
+
+// FoodScreen.dart 위에 추가 (class 밖)
+final Map<String, Map<String, double>> nutritionData = {
+  'food': {'calories': 100, 'protein': 5.0, 'fat': 2.0, 'carbs': 20.0},  // "Food" 라벨용 임시 데이터
+  'apple': {'calories': 52, 'protein': 0.3, 'fat': 0.2, 'carbs': 14.0},
+  'banana': {'calories': 89, 'protein': 1.1, 'fat': 0.3, 'carbs': 23.0},
+  // 더 추가: 실제 값은 Google 검색으로 채우기 (예: USDA Food Database)
+};
+
+extension StringExt on String {
+  String capitalize() => length > 0 ? this[0].toUpperCase() + substring(1) : this;
+}
 
 class FoodScreen extends ConsumerStatefulWidget {
   const FoodScreen({super.key});
@@ -17,17 +36,33 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final ImagePicker _picker = ImagePicker();
+  final NutritionRepository _nutritionRepo = NutritionRepository();
+  late VisionDetector _detector;
+  bool _detectorReady = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _initializeDetector();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _detector.dispose();
     super.dispose();
+  }
+
+  Future<void> _initializeDetector() async {
+    try {
+      _detector = YoloViewDetector(modelPath: 'yolo11n');
+      await _detector.load();
+    } catch (_) {
+      _detector = MockDetector();
+      await _detector.load();
+    }
+    if (mounted) setState(() => _detectorReady = _detector.isLoaded);
   }
 
   @override
@@ -54,7 +89,7 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          _showAddFoodDialog();
+          _pickAndRecognize(ImageSource.camera);
         },
         child: const Icon(Icons.camera_alt),
       ),
@@ -105,48 +140,57 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
             Text(
               '오늘의 칼로리',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 16),
-            
-            // Circular Progress
-            SizedBox(
-              width: 120,
-              height: 120,
-              child: Stack(
-                children: [
-                  CircularProgressIndicator(
+
+            // Circular Progress and Text in a Row
+            Row(
+              mainAxisAlignment:
+                  MainAxisAlignment.center, // Row 내부 요소들을 가로축 중앙에 배치 (선택 사항)
+              crossAxisAlignment:
+                  CrossAxisAlignment.center, // Row 내부 요소들을 세로축 중앙에 배치
+              children: [
+                // CircularProgressIndicator on the left
+                SizedBox(
+                  width: 40, // 원 그래프 크기 조절
+                  height: 40, // 원 그래프 크기 조절
+                  child: CircularProgressIndicator(
                     value: 0.65,
                     strokeWidth: 8,
-                    backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+                    backgroundColor:
+                        Theme.of(context).colorScheme.surfaceVariant,
                     valueColor: AlwaysStoppedAnimation<Color>(
                       Theme.of(context).colorScheme.primary,
                     ),
                   ),
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '760',
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                        Text(
-                          '/ 1200 kcal',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
+                ),
+                const SizedBox(width: 24), // 그래프와 텍스트 사이 간격
+
+                // Text on the right
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, // 텍스트를 왼쪽 정렬
+                  mainAxisAlignment: MainAxisAlignment.center, // 세로축 중앙 정렬
+                  children: [
+                    Text(
+                      '760',
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
                     ),
-                  ),
-                ],
-              ),
+                    Text(
+                      '/ 1200 kcal',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            
+            const SizedBox(height: 25),
+
             // Macros
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -162,7 +206,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
     );
   }
 
-  Widget _buildMacroInfo(String name, String amount, String percentage, Color color) {
+  Widget _buildMacroInfo(
+      String name, String amount, String percentage, Color color) {
     return Column(
       children: [
         Text(
@@ -173,23 +218,25 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
         Text(
           amount,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
         ),
         Text(
           percentage,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: color,
-          ),
+                color: color,
+              ),
         ),
       ],
     );
   }
 
-  Widget _buildMealSection(String mealName, IconData icon, List<Map<String, dynamic>> foods) {
-    final totalCalories = foods.fold<int>(0, (sum, food) => sum + (food['calories'] as int));
-    
+  Widget _buildMealSection(
+      String mealName, IconData icon, List<Map<String, dynamic>> foods) {
+    final totalCalories =
+        foods.fold<int>(0, (sum, food) => sum + (food['calories'] as int));
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -203,30 +250,33 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                 Text(
                   mealName,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
                 const Spacer(),
                 Text(
                   '${totalCalories} kcal',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            
             if (foods.isEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceVariant
+                      .withOpacity(0.5),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                    color:
+                        Theme.of(context).colorScheme.outline.withOpacity(0.3),
                     style: BorderStyle.solid,
                   ),
                 ),
@@ -241,57 +291,71 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                     Text(
                       '음식을 추가해보세요',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ],
                 ),
               )
             else
-              ...foods.map((food) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceVariant,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.restaurant,
-                        size: 20,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            food['name'] as String,
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w500,
+              ...foods
+                  .map((food) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceVariant,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.restaurant,
+                                size: 20,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
                             ),
-                          ),
-                          Text(
-                            food['time'] as String,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      '${food['calories']} kcal',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              )).toList(),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    food['name'] as String,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                  ),
+                                  Text(
+                                    food['time'] as String,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              '${food['calories']} kcal',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ))
+                  .toList(),
           ],
         ),
       ),
@@ -314,8 +378,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                   Text(
                     '주간 칼로리 추이',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 16),
                   Container(
@@ -325,8 +389,10 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                         '차트 영역\n(실제 구현 시 charts_flutter 패키지 사용)',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                       ),
                     ),
                   ),
@@ -346,8 +412,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                   Text(
                     '영양소 분석',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 16),
                   _buildNutritionBar('탄수화물', 0.6, Colors.orange),
@@ -373,8 +439,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
                   Text(
                     'AI 추천',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 16),
                   _buildRecommendationItem(
@@ -409,15 +475,15 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
             Text(
               name,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+                    fontWeight: FontWeight.w500,
+                  ),
             ),
             Text(
               '${(progress * 100).toInt()}%',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
           ],
         ),
@@ -431,7 +497,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
     );
   }
 
-  Widget _buildRecommendationItem(String title, String description, IconData icon, Color color) {
+  Widget _buildRecommendationItem(
+      String title, String description, IconData icon, Color color) {
     return Row(
       children: [
         Container(
@@ -450,14 +517,14 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
               Text(
                 title,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
               Text(
                 description,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
             ],
           ),
@@ -471,16 +538,15 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
       padding: const EdgeInsets.all(16),
       itemCount: 7,
       itemBuilder: (context, index) {
-        final dates = [
-          '오늘', '어제', '2일 전', '3일 전', '4일 전', '5일 전', '6일 전'
-        ];
+        final dates = ['오늘', '어제', '2일 전', '3일 전', '4일 전', '5일 전', '6일 전'];
         final calories = [760, 1180, 1050, 1320, 980, 1150, 1200];
-        
+
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              backgroundColor:
+                  Theme.of(context).colorScheme.primary.withOpacity(0.1),
               child: Icon(
                 Icons.calendar_today,
                 color: Theme.of(context).colorScheme.primary,
@@ -490,8 +556,8 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
             title: Text(
               dates[index],
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             subtitle: Text('총 ${calories[index]} kcal'),
             trailing: Icon(Icons.chevron_right),
@@ -504,121 +570,178 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
     );
   }
 
-  Future<void> _captureAndRecognize() async {
-    final XFile? picked = await _picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 80,
-    );
-
+  // YOLO 기반 인식 실행 및 결과 편집 시트 표시
+  Future<void> _pickAndRecognize(ImageSource source) async {
+    final XFile? picked = await _picker.pickImage(source: source, imageQuality: 85);
     if (picked == null) return;
 
-    final notifier = ref.read(foodRecognitionProvider.notifier);
-    await notifier.recognizeFood(File(picked.path));
+    if (!_detectorReady) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('인식 엔진 준비 중입니다. 잠시 후 다시 시도하세요.')),
+      );
+      return;
+    }
 
-    final result = ref.read(foodRecognitionProvider);
+    final detections = await _detector.detect(File(picked.path));
+    if (detections.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('음식을 감지하지 못했습니다. 조명/각도를 바꿔 다시 시도하세요.')),
+      );
+      return;
+    }
+
+    // 원본 이미지 크기 파악
+    final bytes = await File(picked.path).readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final imgW = frame.image.width.toDouble();
+    final imgH = frame.image.height.toDouble();
+    frame.image.dispose();
+    codec.dispose();
+
+    // 바운딩박스 면적 비율에 따른 초기 분량 추정
+    final items = <RecognizedFoodItem>[];
+    for (final d in detections) {
+      final area = d.bbox.width * d.bbox.height;
+      final ratio = area / (imgW * imgH + 1);
+      int grams = ratio > 0.25 ? 300 : (ratio > 0.12 ? 200 : 120);
+
+      final per100 = await _nutritionRepo.findPer100g(d.label) ??
+          const NutritionPer100g(kcal: 0, carbs: 0, protein: 0, fat: 0, fiber: 0);
+
+      items.add(
+        RecognizedFoodItem(
+          label: d.label,
+          confidence: d.score,
+          grams: grams,
+          kcalPer100g: per100.kcal,
+          carbsPer100g: per100.carbs,
+          proteinPer100g: per100.protein,
+          fatPer100g: per100.fat,
+        ),
+      );
+    }
 
     if (!mounted) return;
-
-    if (result.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('인식 실패: ${result.error}')),
-      );
-      return;
-    }
-
-    if (result.recognizedFoods.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('인식된 음식이 없습니다')),
-      );
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => _RecognitionResultSheet(foods: result.recognizedFoods),
-    );
+    _showRecognitionEditSheet(items);
   }
 
-  void _showAddFoodDialog() {
+  void _showRecognitionEditSheet(List<RecognizedFoodItem> items) {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '음식 추가하기',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setModalState) {
+          double totalKcal = items.fold(0, (s, e) => s + e.calories);
+          double totalCarbs = items.fold(0, (s, e) => s + e.carbs);
+          double totalProtein = items.fold(0, (s, e) => s + e.protein);
+          double totalFat = items.fold(0, (s, e) => s + e.fat);
+
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text('인식 결과 확인', style: Theme.of(context).textTheme.titleLarge),
+                      const Spacer(),
+                      if (!_detectorReady)
+                        const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ...items.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final item = entry.value;
+                    return Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text('${item.label}  ', style: Theme.of(context).textTheme.titleMedium),
+                                Text('(${(item.confidence * 100).toStringAsFixed(0)}%)',
+                                    style: Theme.of(context).textTheme.bodySmall),
+                                const Spacer(),
+                                Text('${item.calories.toStringAsFixed(0)} kcal',
+                                    style: Theme.of(context).textTheme.titleSmall),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Slider(
+                                    value: item.grams.toDouble(),
+                                    min: 40,
+                                    max: 500,
+                                    divisions: 46,
+                                    label: '${item.grams} g',
+                                    onChanged: (v) {
+                                      setModalState(() {
+                                        items[idx] = item.copyWith(grams: v.round());
+                                      });
+                                    },
+                                  ),
+                                ),
+                                SizedBox(width: 64, child: Text('${item.grams} g')),
+                              ],
+                            ),
+                            Text(
+                              '탄수화물 ${item.carbs.toStringAsFixed(1)}g · 단백질 ${item.protein.toStringAsFixed(1)}g · 지방 ${item.fat.toStringAsFixed(1)}g',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text('합계', style: Theme.of(context).textTheme.titleMedium),
+                      const Spacer(),
+                      Text('${totalKcal.toStringAsFixed(0)} kcal', style: Theme.of(context).textTheme.titleMedium),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '탄 ${totalCarbs.toStringAsFixed(1)}g · 단 ${totalProtein.toStringAsFixed(1)}g · 지 ${totalFat.toStringAsFixed(1)}g',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('임시 저장 완료 (서버/챗봇 연동 준비)')),
+                        );
+                        // TODO: 서버 저장(/food/entries) 및 챗봇 컨텍스트 푸시
+                      },
+                      icon: const Icon(Icons.save),
+                      label: const Text('저장'),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _captureAndRecognize();
-                    },
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text('사진 촬영'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('직접 입력 기능 준비 중입니다')),
-                      );
-                    },
-                    icon: const Icon(Icons.edit),
-                    label: const Text('직접 입력'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RecognitionResultSheet extends StatelessWidget {
-  final List<FoodItem> foods;
-
-  const _RecognitionResultSheet({required this.foods});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '인식 결과',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            ...foods.map(
-              (f) => ListTile(
-                title: Text(f.name),
-                subtitle: Text(
-                    '${(f.caloriesPerGram * 100).toStringAsFixed(0)} kcal/100g'),
-              ),
-            ),
-          ],
-        ),
-      ),
+          );
+        });
+      },
     );
   }
 }
