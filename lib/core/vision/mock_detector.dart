@@ -12,12 +12,20 @@ class MockDetector implements VisionDetector {
 
   @override
   bool get isLoaded => _loaded;
+  
+  @override
+  void dispose() {
+    _loaded = false;
+  }
 
   @override
   Future<List<Detection>> detect(File imageFile) async {
     // 단순 모의 감지: 중앙 박스 하나 반환
     // 실제 앱 플로우를 테스트하기 위한 용도
-    final img = await decodeImageFromList(await imageFile.readAsBytes());
+    final bytes = await imageFile.readAsBytes();
+    final codec = await instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final img = frame.image;
     return [
       Detection(
         bbox: Rect.fromLTWH(

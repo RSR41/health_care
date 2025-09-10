@@ -382,7 +382,7 @@ class FoodRecognitionNotifier extends StateNotifier<FoodRecognitionState> {
     try {
       final response = await _apiService.recognizeFood(image);
       state = state.copyWith(
-        recognizedFoods: response.recognizedFoods,
+        recognizedFoods: response.foods,
         isLoading: false,
       );
     } catch (e) {

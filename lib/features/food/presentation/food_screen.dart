@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/vision/detector.dart';
-import '../../../core/vision/ultralytics_yolo_detector.dart';
+import '../../../core/vision/yolo_view_detector.dart';
 import '../../../core/vision/mock_detector.dart';
 import '../../food/services/nutrition_repository.dart';
 import '../../../core/vision/detection.dart';
@@ -56,7 +56,7 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
 
   Future<void> _initializeDetector() async {
     try {
-      _detector = UltralyticsYoloDetector(modelPath: 'yolo11n');
+      _detector = YoloViewDetector(modelPath: 'yolo11n');
       await _detector.load();
     } catch (_) {
       _detector = MockDetector();
@@ -570,53 +570,6 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
     );
   }
 
-  void _showAddFoodDialog() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '음식 추가하기',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _pickAndRecognize(ImageSource.camera);
-                    },
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text('사진 촬영'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('직접 입력 기능 준비 중입니다')),
-                      );
-                    },
-                    icon: const Icon(Icons.edit),
-                    label: const Text('직접 입력'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
   // YOLO 기반 인식 실행 및 결과 편집 시트 표시
   Future<void> _pickAndRecognize(ImageSource source) async {
     final XFile? picked = await _picker.pickImage(source: source, imageQuality: 85);
@@ -641,9 +594,12 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
 
     // 원본 이미지 크기 파악
     final bytes = await File(picked.path).readAsBytes();
-    final imgInfo = await ui.decodeImageFromList(bytes);
-    final imgW = imgInfo.width.toDouble();
-    final imgH = imgInfo.height.toDouble();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final imgW = frame.image.width.toDouble();
+    final imgH = frame.image.height.toDouble();
+    frame.image.dispose();
+    codec.dispose();
 
     // 바운딩박스 면적 비율에 따른 초기 분량 추정
     final items = <RecognizedFoodItem>[];
@@ -790,37 +746,3 @@ class _FoodScreenState extends ConsumerState<FoodScreen>
   }
 }
 
-class _RecognitionResultSheet extends StatelessWidget {
-  final List<FoodItem> foods;
-
-  const _RecognitionResultSheet({required this.foods});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '인식 결과',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            ...foods.map(
-              (f) => ListTile(
-                title: Text(f.name),
-                subtitle: Text(
-                    '${(f.caloriesPerGram * 100).toStringAsFixed(0)} kcal/100g'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

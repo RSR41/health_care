@@ -57,6 +57,12 @@ flutter packages pub run build_runner build --delete-conflicting-outputs
 # Run static analysis
 flutter analyze
 
+# Format code
+dart format .
+
+# Check formatting without modifying files
+dart format --set-exit-if-changed .
+
 # Run all tests
 flutter test
 
@@ -171,3 +177,34 @@ The project follows standard Flutter/Dart conventions:
 - Consistent use of `const` constructors where possible
 - Analysis options from `flutter_lints` package
 - Prefer single quotes for strings (when enabled in linter)
+
+## Common Troubleshooting
+
+### Build Issues
+```bash
+# Clean build artifacts and dependencies
+flutter clean
+flutter pub get
+flutter packages pub run build_runner build --delete-conflicting-outputs
+
+# Fix iOS pod issues
+cd ios && pod install && cd ..
+
+# Reset Flutter configuration
+flutter doctor -v
+
+# Clear Gradle cache (Android)
+cd android && ./gradlew clean && cd ..
+```
+
+### Windows Development
+```bash
+# Enable Windows desktop support
+flutter config --enable-windows-desktop
+
+# Build Windows executable
+flutter build windows
+
+# Run on Windows
+flutter run -d windows
+```
