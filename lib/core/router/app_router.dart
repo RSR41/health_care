@@ -16,6 +16,7 @@ import '../../features/medication/presentation/medication_screen.dart';
 import '../../features/cosmetics/presentation/cosmetics_screen.dart';
 import '../../features/weather/presentation/weather_screen.dart';
 import '../../shared/widgets/main_navigation.dart';
+import '../../debug/database_debug_screen.dart';
 
 // Route paths
 class AppRoutes {
@@ -35,6 +36,7 @@ class AppRoutes {
   static const String weather = '/weather';
   static const String profile = '/profile';
   static const String settings = '/settings';
+  static const String databaseDebug = '/database-debug';
 }
 
 // Router Provider
@@ -56,6 +58,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.register,
         builder: (context, state) => const RegisterScreen(),
+      ),
+      
+      // Debug Routes
+      GoRoute(
+        path: AppRoutes.databaseDebug,
+        builder: (context, state) => const DatabaseDebugScreen(),
       ),
       
       // Main App Shell with Bottom Navigation

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import '../providers/report_providers.dart';
 
 class ReportScreen extends ConsumerStatefulWidget {
   const ReportScreen({super.key});
@@ -63,107 +64,109 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with TickerProvider
   }
 
   Widget _buildActivityReport() {
+    final activityReport = ref.watch(weeklyActivityReportProvider);
+    
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSummaryCard(
-            '이번 주 활동 요약',
-            [
-              _buildSummaryItem('평균 걸음 수', '8,542', '목표 대비 85%', Colors.blue),
-              _buildSummaryItem('총 운동 시간', '4시간 32분', '목표 대비 91%', Colors.green),
-              _buildSummaryItem('소모 칼로리', '2,847 kcal', '목표 대비 95%', Colors.orange),
-            ],
+          activityReport.when(
+            data: (report) => _buildSummaryCard(
+              '이번 주 활동 요약',
+              [
+                _buildSummaryItem(
+                  '평균 걸음 수', 
+                  _formatNumber(report['avgSteps']), 
+                  '목표 대비 ${(report['stepsProgress'] * 100).round()}%', 
+                  Colors.blue,
+                ),
+                _buildSummaryItem(
+                  '총 운동 시간', 
+                  '${_formatDuration(report['totalActiveMinutes'])}', 
+                  '목표 대비 ${(report['activeMinutesProgress'] * 100).round()}%', 
+                  Colors.green,
+                ),
+                _buildSummaryItem(
+                  '소모 칼로리', 
+                  '${_formatNumber(report['totalCalories'])} kcal', 
+                  '목표 대비 ${(report['caloriesProgress'] * 100).round()}%', 
+                  Colors.orange,
+                ),
+              ],
+            ),
+            loading: () => _buildLoadingSummaryCard('이번 주 활동 요약'),
+            error: (_, __) => _buildErrorSummaryCard('이번 주 활동 요약'),
           ),
           const SizedBox(height: 16),
           
-          _buildChartCard(
-            '일별 걸음 수',
-            SizedBox(
-              height: 200,
-              child: LineChart(
-                LineChartData(
-                  gridData: const FlGridData(show: true),
-                  titlesData: FlTitlesData(
-                    leftTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+          activityReport.when(
+            data: (report) => _buildChartCard(
+              '일별 걸음 수',
+              SizedBox(
+                height: 200,
+                child: LineChart(
+                  LineChartData(
+                    gridData: const FlGridData(show: true),
+                    titlesData: FlTitlesData(
+                      leftTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+                      ),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          getTitlesWidget: (value, meta) {
+                            const days = ['월', '화', '수', '목', '금', '토', '일'];
+                            if (value.toInt() >= 0 && value.toInt() < days.length) {
+                              return Text(days[value.toInt()]);
+                            }
+                            return const Text('');
+                          },
+                        ),
+                      ),
+                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          const days = ['월', '화', '수', '목', '금', '토', '일'];
-                          if (value.toInt() >= 0 && value.toInt() < days.length) {
-                            return Text(days[value.toInt()]);
-                          }
-                          return const Text('');
-                        },
+                    borderData: FlBorderData(show: true),
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: _generateStepsChartSpots(report['dailyStepsData']),
+                        isCurved: true,
+                        color: Colors.blue,
+                        barWidth: 3,
+                        dotData: const FlDotData(show: true),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            loading: () => _buildLoadingChart('일별 걸음 수'),
+            error: (_, __) => _buildErrorChart('일별 걸음 수'),
+          ),
+          const SizedBox(height: 16),
+          
+          Consumer(
+            builder: (context, ref, child) {
+              final workoutDistribution = ref.watch(workoutTypeDistributionProvider);
+              
+              return workoutDistribution.when(
+                data: (distribution) => _buildChartCard(
+                  '운동 유형별 분포',
+                  SizedBox(
+                    height: 200,
+                    child: PieChart(
+                      PieChartData(
+                        sections: _generateWorkoutPieChartSections(distribution),
+                        centerSpaceRadius: 40,
                       ),
                     ),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   ),
-                  borderData: FlBorderData(show: true),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: [
-                        const FlSpot(0, 7500),
-                        const FlSpot(1, 8200),
-                        const FlSpot(2, 9100),
-                        const FlSpot(3, 8800),
-                        const FlSpot(4, 9500),
-                        const FlSpot(5, 7800),
-                        const FlSpot(6, 8900),
-                      ],
-                      isCurved: true,
-                      color: Colors.blue,
-                      barWidth: 3,
-                      dotData: const FlDotData(show: true),
-                    ),
-                  ],
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          _buildChartCard(
-            '운동 유형별 분포',
-            SizedBox(
-              height: 200,
-              child: PieChart(
-                PieChartData(
-                  sections: [
-                    PieChartSectionData(
-                      value: 40,
-                      title: '유산소\n40%',
-                      color: Colors.blue,
-                      radius: 80,
-                    ),
-                    PieChartSectionData(
-                      value: 30,
-                      title: '근력\n30%',
-                      color: Colors.green,
-                      radius: 80,
-                    ),
-                    PieChartSectionData(
-                      value: 20,
-                      title: '요가\n20%',
-                      color: Colors.purple,
-                      radius: 80,
-                    ),
-                    PieChartSectionData(
-                      value: 10,
-                      title: '기타\n10%',
-                      color: Colors.orange,
-                      radius: 80,
-                    ),
-                  ],
-                  centerSpaceRadius: 40,
-                ),
-              ),
-            ),
+                loading: () => _buildLoadingChart('운동 유형별 분포'),
+                error: (_, __) => _buildErrorChart('운동 유형별 분포'),
+              );
+            },
           ),
         ],
       ),
@@ -171,94 +174,115 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with TickerProvider
   }
 
   Widget _buildNutritionReport() {
+    final nutritionReport = ref.watch(weeklyNutritionReportProvider);
+    
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSummaryCard(
-            '이번 주 영양 요약',
-            [
-              _buildSummaryItem('평균 칼로리', '1,847 kcal', '목표 대비 92%', Colors.red),
-              _buildSummaryItem('단백질 섭취', '78g', '목표 대비 104%', Colors.blue),
-              _buildSummaryItem('수분 섭취', '1.8L', '목표 대비 90%', Colors.cyan),
-            ],
+          nutritionReport.when(
+            data: (report) => _buildSummaryCard(
+              '이번 주 영양 요약',
+              [
+                _buildSummaryItem(
+                  '평균 칼로리', 
+                  '${_formatNumber(report['avgCalories'])} kcal', 
+                  '목표 대비 ${(report['calorieProgress'] * 100).round()}%', 
+                  Colors.red,
+                ),
+                _buildSummaryItem(
+                  '단백질 섭취', 
+                  '${report['avgProtein']}g', 
+                  '목표 대비 ${(report['proteinProgress'] * 100).round()}%', 
+                  Colors.blue,
+                ),
+                _buildSummaryItem(
+                  '수분 섭취', 
+                  '${report['waterIntake']}L', 
+                  '목표 대비 ${(report['waterProgress'] * 100).round()}%', 
+                  Colors.cyan,
+                ),
+              ],
+            ),
+            loading: () => _buildLoadingSummaryCard('이번 주 영양 요약'),
+            error: (_, __) => _buildErrorSummaryCard('이번 주 영양 요약'),
           ),
           const SizedBox(height: 16),
           
-          _buildChartCard(
-            '일별 칼로리 섭취',
-            SizedBox(
-              height: 200,
-              child: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: 2500,
-                  titlesData: FlTitlesData(
-                    leftTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: true, reservedSize: 40),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          const days = ['월', '화', '수', '목', '금', '토', '일'];
-                          if (value.toInt() >= 0 && value.toInt() < days.length) {
-                            return Text(days[value.toInt()]);
-                          }
-                          return const Text('');
-                        },
+          nutritionReport.when(
+            data: (report) => _buildChartCard(
+              '일별 칼로리 섭취',
+              SizedBox(
+                height: 200,
+                child: BarChart(
+                  BarChartData(
+                    alignment: BarChartAlignment.spaceAround,
+                    maxY: _getMaxCalorie(report['dailyCaloriesData']) * 1.2,
+                    titlesData: FlTitlesData(
+                      leftTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: true, reservedSize: 40),
                       ),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          getTitlesWidget: (value, meta) {
+                            const days = ['월', '화', '수', '목', '금', '토', '일'];
+                            if (value.toInt() >= 0 && value.toInt() < days.length) {
+                              return Text(days[value.toInt()]);
+                            }
+                            return const Text('');
+                          },
+                        ),
+                      ),
+                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     ),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    borderData: FlBorderData(show: true),
+                    barGroups: _generateCalorieBarChartGroups(report['dailyCaloriesData']),
                   ),
-                  borderData: FlBorderData(show: true),
-                  barGroups: [
-                    BarChartGroupData(x: 0, barRods: [BarChartRodData(toY: 1800, color: Colors.green)]),
-                    BarChartGroupData(x: 1, barRods: [BarChartRodData(toY: 1950, color: Colors.green)]),
-                    BarChartGroupData(x: 2, barRods: [BarChartRodData(toY: 1750, color: Colors.green)]),
-                    BarChartGroupData(x: 3, barRods: [BarChartRodData(toY: 2100, color: Colors.green)]),
-                    BarChartGroupData(x: 4, barRods: [BarChartRodData(toY: 1850, color: Colors.green)]),
-                    BarChartGroupData(x: 5, barRods: [BarChartRodData(toY: 2200, color: Colors.green)]),
-                    BarChartGroupData(x: 6, barRods: [BarChartRodData(toY: 1900, color: Colors.green)]),
-                  ],
                 ),
               ),
             ),
+            loading: () => _buildLoadingChart('일별 칼로리 섭취'),
+            error: (_, __) => _buildErrorChart('일별 칼로리 섭취'),
           ),
           const SizedBox(height: 16),
           
-          _buildChartCard(
-            '영양소 균형',
-            SizedBox(
-              height: 200,
-              child: PieChart(
-                PieChartData(
-                  sections: [
-                    PieChartSectionData(
-                      value: 50,
-                      title: '탄수화물\n50%',
-                      color: Colors.amber,
-                      radius: 80,
-                    ),
-                    PieChartSectionData(
-                      value: 25,
-                      title: '단백질\n25%',
-                      color: Colors.red,
-                      radius: 80,
-                    ),
-                    PieChartSectionData(
-                      value: 25,
-                      title: '지방\n25%',
-                      color: Colors.blue,
-                      radius: 80,
-                    ),
-                  ],
-                  centerSpaceRadius: 40,
+          nutritionReport.when(
+            data: (report) => _buildChartCard(
+              '영양소 균형',
+              SizedBox(
+                height: 200,
+                child: PieChart(
+                  PieChartData(
+                    sections: [
+                      PieChartSectionData(
+                        value: (report['carbsRatio'] * 100),
+                        title: '탄수화물\n${(report['carbsRatio'] * 100).round()}%',
+                        color: Colors.amber,
+                        radius: 80,
+                      ),
+                      PieChartSectionData(
+                        value: (report['proteinRatio'] * 100),
+                        title: '단백질\n${(report['proteinRatio'] * 100).round()}%',
+                        color: Colors.red,
+                        radius: 80,
+                      ),
+                      PieChartSectionData(
+                        value: (report['fatRatio'] * 100),
+                        title: '지방\n${(report['fatRatio'] * 100).round()}%',
+                        color: Colors.blue,
+                        radius: 80,
+                      ),
+                    ],
+                    centerSpaceRadius: 40,
+                  ),
                 ),
               ),
             ),
+            loading: () => _buildLoadingChart('영양소 균형'),
+            error: (_, __) => _buildErrorChart('영양소 균형'),
           ),
         ],
       ),
@@ -353,67 +377,73 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with TickerProvider
   }
 
   Widget _buildHealthScoreCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '종합 건강 점수',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Center(
-              child: SizedBox(
-                width: 150,
-                height: 150,
-                child: Stack(
-                  children: [
-                    CircularProgressIndicator(
-                      value: 0.85,
-                      strokeWidth: 12,
-                      backgroundColor: Colors.grey.shade300,
-                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
-                    ),
-                    Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '85',
-                            style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                            ),
-                          ),
-                          Text(
-                            '점',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+    final healthScore = ref.watch(healthScoreProvider);
+    
+    return healthScore.when(
+      data: (score) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '종합 건강 점수',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildScoreItem('활동', 88, Colors.blue),
-                _buildScoreItem('식단', 82, Colors.green),
-                _buildScoreItem('수면', 85, Colors.indigo),
-              ],
-            ),
-          ],
+              const SizedBox(height: 20),
+              Center(
+                child: SizedBox(
+                  width: 150,
+                  height: 150,
+                  child: Stack(
+                    children: [
+                      CircularProgressIndicator(
+                        value: score['overall'] / 100.0,
+                        strokeWidth: 12,
+                        backgroundColor: Colors.grey.shade300,
+                        valueColor: AlwaysStoppedAnimation<Color>(_getScoreColor(score['overall'])),
+                      ),
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '${score['overall']}',
+                              style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: _getScoreColor(score['overall']),
+                              ),
+                            ),
+                            Text(
+                              '점',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: _getScoreColor(score['overall']),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildScoreItem('활동', score['activity'], Colors.blue),
+                  _buildScoreItem('식단', score['nutrition'], Colors.green),
+                  _buildScoreItem('수면', score['sleep'], Colors.indigo),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
+      loading: () => _buildLoadingHealthScoreCard(),
+      error: (_, __) => _buildErrorHealthScoreCard(),
     );
   }
 
@@ -436,51 +466,54 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with TickerProvider
   }
 
   Widget _buildAIInsightsCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.psychology,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'AI 인사이트',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+    final aiInsights = ref.watch(aiInsightsProvider);
+    
+    return aiInsights.when(
+      data: (insights) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.psychology,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildInsightItem(
-              '운동 패턴 분석',
-              '주말에 운동량이 증가하는 패턴을 보입니다. 평일 운동 시간을 늘리면 더 균형잡힌 활동이 가능할 것 같습니다.',
-              Icons.fitness_center,
-              Colors.blue,
-            ),
-            const SizedBox(height: 12),
-            _buildInsightItem(
-              '수면 품질 개선',
-              '수요일과 목요일에 수면 시간이 부족합니다. 이 날들의 취침 시간을 30분 앞당기는 것을 권장합니다.',
-              Icons.bedtime,
-              Colors.indigo,
-            ),
-            const SizedBox(height: 12),
-            _buildInsightItem(
-              '영양 균형',
-              '단백질 섭취량이 목표를 초과하고 있어 좋습니다. 다만 수분 섭취를 조금 더 늘리시면 좋겠습니다.',
-              Icons.restaurant,
-              Colors.green,
-            ),
-          ],
+                  const SizedBox(width: 8),
+                  Text(
+                    'AI 인사이트',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              ...insights.asMap().entries.map((entry) {
+                final index = entry.key;
+                final insight = entry.value;
+                
+                return Column(
+                  children: [
+                    if (index > 0) const SizedBox(height: 12),
+                    _buildInsightItem(
+                      insight['title'],
+                      insight['description'],
+                      _getIconFromString(insight['icon']),
+                      _getColorFromString(insight['color']),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ],
+          ),
         ),
       ),
+      loading: () => _buildLoadingInsightsCard(),
+      error: (_, __) => _buildErrorInsightsCard(),
     );
   }
 
@@ -513,29 +546,44 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with TickerProvider
   }
 
   Widget _buildGoalProgressCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '목표 달성률',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+    final goalAchievement = ref.watch(goalAchievementProvider);
+    
+    return goalAchievement.when(
+      data: (goals) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '목표 달성률',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _buildProgressItem('일일 걸음 수', 0.85, '8,500 / 10,000'),
-            const SizedBox(height: 12),
-            _buildProgressItem('주간 운동 시간', 0.91, '4.5시간 / 5시간'),
-            const SizedBox(height: 12),
-            _buildProgressItem('수분 섭취량', 0.90, '1.8L / 2L'),
-            const SizedBox(height: 12),
-            _buildProgressItem('수면 시간', 0.98, '7.3시간 / 7.5시간'),
-          ],
+              const SizedBox(height: 16),
+              
+              ...goals.asMap().entries.map((entry) {
+                final index = entry.key;
+                final goal = entry.value;
+                
+                return Column(
+                  children: [
+                    if (index > 0) const SizedBox(height: 12),
+                    _buildProgressItem(
+                      goal['title'],
+                      goal['progress'],
+                      '${_formatGoalValue(goal['current'], goal['unit'])} / ${_formatGoalValue(goal['target'], goal['unit'])}',
+                    ),
+                  ],
+                );
+              }).toList(),
+            ],
+          ),
         ),
       ),
+      loading: () => _buildLoadingGoalProgressCard(),
+      error: (_, __) => _buildErrorGoalProgressCard(),
     );
   }
 
@@ -581,42 +629,45 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with TickerProvider
   }
 
   Widget _buildRecommendationsCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '개인 맞춤 권장사항',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+    final recommendations = ref.watch(recommendationsProvider);
+    
+    return recommendations.when(
+      data: (recs) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '개인 맞춤 권장사항',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _buildRecommendationItem(
-              '운동',
-              '평일 점심시간에 15분 산책을 추가해보세요',
-              Icons.directions_walk,
-              Colors.blue,
-            ),
-            const SizedBox(height: 12),
-            _buildRecommendationItem(
-              '식단',
-              '오후 간식으로 견과류를 섭취하면 좋겠습니다',
-              Icons.restaurant,
-              Colors.green,
-            ),
-            const SizedBox(height: 12),
-            _buildRecommendationItem(
-              '수면',
-              '취침 1시간 전 스마트폰 사용을 줄여보세요',
-              Icons.bedtime,
-              Colors.indigo,
-            ),
-          ],
+              const SizedBox(height: 16),
+              
+              ...recs.asMap().entries.map((entry) {
+                final index = entry.key;
+                final rec = entry.value;
+                
+                return Column(
+                  children: [
+                    if (index > 0) const SizedBox(height: 12),
+                    _buildRecommendationItem(
+                      rec['category'],
+                      rec['recommendation'],
+                      _getIconFromString(rec['icon']),
+                      _getColorFromString(rec['color']),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ],
+          ),
         ),
       ),
+      loading: () => _buildLoadingRecommendationsCard(),
+      error: (_, __) => _buildErrorRecommendationsCard(),
     );
   }
 
@@ -734,6 +785,462 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with TickerProvider
             ),
             const SizedBox(height: 16),
             chart,
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 헬퍼 메서드들
+
+  /// 숫자 포매팅
+  String _formatNumber(int number) {
+    if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}k';
+    }
+    return number.toString();
+  }
+
+  /// 시간 포매팅 (분 -> 시간/분)
+  String _formatDuration(int minutes) {
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hours > 0) {
+      return '${hours}시간 ${mins}분';
+    }
+    return '${mins}분';
+  }
+
+  /// 목표값 포매팅
+  String _formatGoalValue(dynamic value, String unit) {
+    if (value is double) {
+      if (unit == '시간') {
+        return value.toStringAsFixed(1);
+      }
+      return value.toStringAsFixed(1);
+    }
+    return value.toString();
+  }
+
+  /// 점수 색상 결정
+  Color _getScoreColor(int score) {
+    if (score >= 85) return Colors.green;
+    if (score >= 70) return Colors.orange;
+    return Colors.red;
+  }
+
+  /// 문자열을 아이콘으로 변환
+  IconData _getIconFromString(String iconName) {
+    switch (iconName) {
+      case 'fitness_center': return Icons.fitness_center;
+      case 'restaurant': return Icons.restaurant;
+      case 'bedtime': return Icons.bedtime;
+      case 'directions_walk': return Icons.directions_walk;
+      case 'water_drop': return Icons.water_drop;
+      default: return Icons.info;
+    }
+  }
+
+  /// 문자열을 색상으로 변환
+  Color _getColorFromString(String colorName) {
+    switch (colorName) {
+      case 'blue': return Colors.blue;
+      case 'green': return Colors.green;
+      case 'orange': return Colors.orange;
+      case 'red': return Colors.red;
+      case 'indigo': return Colors.indigo;
+      case 'purple': return Colors.purple;
+      default: return Colors.grey;
+    }
+  }
+
+  /// 걸음 수 차트 스팟 생성
+  List<FlSpot> _generateStepsChartSpots(List<double> stepsData) {
+    return stepsData.asMap().entries.map((entry) {
+      return FlSpot(entry.key.toDouble(), entry.value);
+    }).toList();
+  }
+
+  /// 운동 타입별 파이차트 섹션 생성
+  List<PieChartSectionData> _generateWorkoutPieChartSections(List<Map<String, dynamic>> distribution) {
+    final colors = [Colors.blue, Colors.green, Colors.purple, Colors.orange, Colors.red, Colors.cyan];
+    
+    return distribution.asMap().entries.map((entry) {
+      final index = entry.key;
+      final item = entry.value;
+      final color = colors[index % colors.length];
+      
+      return PieChartSectionData(
+        value: item['value'],
+        title: '${item['type']}\n${item['value'].round()}%',
+        color: color,
+        radius: 80,
+      );
+    }).toList();
+  }
+
+  /// 칼로리 바차트 그룹 생성
+  List<BarChartGroupData> _generateCalorieBarChartGroups(List<double> caloriesData) {
+    return caloriesData.asMap().entries.map((entry) {
+      return BarChartGroupData(
+        x: entry.key,
+        barRods: [
+          BarChartRodData(
+            toY: entry.value,
+            color: Colors.green,
+          ),
+        ],
+      );
+    }).toList();
+  }
+
+  /// 칼로리 데이터에서 최대값 구하기
+  double _getMaxCalorie(List<double> caloriesData) {
+    if (caloriesData.isEmpty) return 2500.0;
+    return caloriesData.reduce((a, b) => a > b ? a : b);
+  }
+
+  // 로딩 상태 카드들
+
+  Widget _buildLoadingSummaryCard(String title) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Center(child: CircularProgressIndicator()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingChart(String title) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const SizedBox(
+              height: 200,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingHealthScoreCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '종합 건강 점수',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Center(child: CircularProgressIndicator()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingInsightsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.psychology,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'AI 인사이트',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Center(child: CircularProgressIndicator()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingGoalProgressCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '목표 달성률',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Center(child: CircularProgressIndicator()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingRecommendationsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '개인 맞춤 권장사항',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Center(child: CircularProgressIndicator()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 에러 상태 카드들
+
+  Widget _buildErrorSummaryCard(String title) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: Column(
+                children: [
+                  const Icon(Icons.error, color: Colors.red, size: 48),
+                  const SizedBox(height: 8),
+                  Text(
+                    '데이터를 불러올 수 없습니다',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorChart(String title) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 200,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error, color: Colors.red, size: 48),
+                    const SizedBox(height: 8),
+                    Text(
+                      '차트를 불러올 수 없습니다',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorHealthScoreCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '종합 건강 점수',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Center(
+              child: Column(
+                children: [
+                  const Icon(Icons.error, color: Colors.red, size: 48),
+                  const SizedBox(height: 8),
+                  Text(
+                    '건강 점수를 계산할 수 없습니다',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorInsightsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.psychology,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'AI 인사이트',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: Column(
+                children: [
+                  const Icon(Icons.error, color: Colors.red, size: 48),
+                  const SizedBox(height: 8),
+                  Text(
+                    'AI 인사이트를 불러올 수 없습니다',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorGoalProgressCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '목표 달성률',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: Column(
+                children: [
+                  const Icon(Icons.error, color: Colors.red, size: 48),
+                  const SizedBox(height: 8),
+                  Text(
+                    '목표 달성률을 불러올 수 없습니다',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorRecommendationsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '개인 맞춤 권장사항',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: Column(
+                children: [
+                  const Icon(Icons.error, color: Colors.red, size: 48),
+                  const SizedBox(height: 8),
+                  Text(
+                    '권장사항을 불러올 수 없습니다',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
